@@ -1,0 +1,76 @@
+service: websockets-api
+
+frameworkVersion: '3'
+useDotenv: true
+
+custom:
+  lambdaEnv:
+    REGION: ${env:REGION}
+    CONNECTIONS_TABLE: ${env:CONNECTIONS_TABLE}
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  region: eu-west-3
+  stage: dev
+  runtime: nodejs14.x
+  websocketsApiName: websockets-api
+  websocketsApiRouteSelectionExpression: $request.body.action
+  websocketsDescription: WebSockets API for PokerStrap
+
+functions:
+  connectionHandler:
+    handler: src/handler.connectionHandler
+    role: lambdaExecutionRole
+    environment: ${self:custom.lambdaEnv}
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+  defaultHandler:
+    handler: src/handler.defaultHandler
+    events:
+      - websocket: $default
+
+resources:
+  Resources:
+    lambdaExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        RoleName: ${self:service}-${sls:stage}-lambdaExecution-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:service}-${sls:stage}-lambdaExecution-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                        - ':'
+                        -
+                          - 'arn:aws:logs'
+                          - Ref: 'AWS::Region'
+                          - Ref: 'AWS::AccountId'
+                          - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action:
+                    - dynamodb:*
+                  Resource:
+                    - ${env:CONNECTIONS_TABLE_ARN}
+                    - ${env:CONNECTIONS_TABLE_ARN}/index/*
