@@ -7,6 +7,7 @@ custom:
   lambdaEnv:
     REGION: ${env:REGION}
     CONNECTIONS_TABLE: ${env:CONNECTIONS_TABLE}
+    COGNITO_USERPOOL_ID: ${env:COGNITO_USERPOOL_ID}
 
 plugins:
   - serverless-plugin-typescript
@@ -22,18 +23,23 @@ provider:
 
 functions:
   connectionHandler:
-    handler: src/handler.connectionHandler
+    handler: src/websockets/handler.connectionHandler
     role: lambdaExecutionRole
     environment: ${self:custom.lambdaEnv}
     events:
       - websocket:
           route: $connect
+          authorizer: auth
       - websocket:
           route: $disconnect
   defaultHandler:
-    handler: src/handler.defaultHandler
+    handler: src/websockets/handler.defaultHandler
     events:
       - websocket: $default
+  auth:
+    handler: src/auth/handler.handler
+    role: lambdaExecutionRole
+    environment: ${self:custom.lambdaEnv}
 
 resources:
   Resources:
